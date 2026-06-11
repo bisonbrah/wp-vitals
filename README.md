@@ -65,25 +65,21 @@ python report.py --site my-client-site --days 7
 
 ### `main.py` - Log Analyzer
 
-Analyzes WordPress debug logs across all local installs. Surfaces critical issues, common error types, and recommended
-fixes. Prioritizes most recently active sites and filters by date range.
+Analyzes WordPress debug logs for a target install. Surfaces critical issues, common error types, and recommended
+fixes. Filters by date range.
 
 ```bash
-# Analyze 10 most recently active sites, last 30 days (default)
-python main.py
-
-# Scope to last 7 days, top 5 sites
-python main.py --days 7 --limit 5
-
-# Target a specific site
+# Analyze a specific site, last 30 days (default)
 python main.py --site my-client-site
+
+# Scope to last 7 days
+python main.py --site my-client-site --days 7
 ```
 
-| Flag      | Default | Description                                       |
-|-----------|---------|---------------------------------------------------|
-| `--days`  | 30      | Only analyze log entries from the last N days     |
-| `--limit` | 10      | Max number of sites to analyze, most recent first |
-| `--site`  | None    | Target a specific site by folder name             |
+| Flag     | Default | Description                                   |
+|----------|---------|-----------------------------------------------|
+| `--days` | 30      | Only analyze log entries from the last N days |
+| `--site` | None    | Target a specific site by folder name         |
 
 ---
 
@@ -115,7 +111,8 @@ python audit_theme.py --site my-client-site
 ### `audit_plugins.py` - Plugin Auditor
 
 Audits installed WordPress plugins using WP-CLI. Flags outdated plugins, major version jumps, inactive plugins, and
-auto-update status. Provides prioritized update recommendations with framework-aware context.
+auto-update status. Automatically resolves Local by Flywheel's MySQL socket environment so no manual shell setup is
+required.
 
 ```bash
 # Audit plugins for a specific site
