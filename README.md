@@ -1,20 +1,14 @@
 # wp-vitals
 
-A CLI agent that analyzes WordPress debug logs across all local installs and surfaces actionable health reports using Claude AI.
-
-For each site it finds, it identifies:
-- Top 3 critical issues with specific file and line references
-- Most common error type
-- Overall health status (Critical / Warning / Healthy)
-- A recommended action to resolve the primary issue
-
-Built for developers managing multiple local WordPress installs who don't want to manually grep through debug logs.
+A growing suite of CLI tools for WordPress developers who are swamped, context-switching between projects, and need a
+fast TL;DR on how broken a site is before diving in.
 
 ---
 
 ## Requirements
 
 - Python 3.10+
+- Node.js + npm (for theme audits)
 - [Local by Flywheel](https://localwp.com/) (or any local WordPress environment)
 - Anthropic API key ([get one here](https://console.anthropic.com))
 
@@ -24,13 +18,13 @@ Built for developers managing multiple local WordPress installs who don't want t
 
 1. Clone the repo:
    ```bash
-   git clone https://github.com/bisonbrah/wp-health.git
-   cd wp-health
+   git clone https://github.com/bisonbrah/wp-vitals.git
+   cd wp-vitals
    ```
 
 2. Install dependencies:
    ```bash
-   pip install anthropic python-dotenv
+   pip install -r requirements.txt
    ```
 
 3. Create a `.env` file in the project root:
@@ -39,14 +33,14 @@ Built for developers managing multiple local WordPress installs who don't want t
    LOCAL_SITES_PATH=/path/to/your/local/sites
    ```
 
-4. Run it:
-   ```bash
-   python main.py
-   ```
-
 ---
 
-## Usage
+## Scripts
+
+### `main.py` - Log Analyzer
+
+Analyzes WordPress debug logs across all local installs. Surfaces critical issues, common error types, and recommended
+fixes. Prioritizes most recently active sites and filters by date range.
 
 ```bash
 # Analyze 10 most recently active sites, last 30 days (default)
@@ -57,57 +51,48 @@ python main.py --days 7 --limit 5
 
 # Target a specific site
 python main.py --site my-client-site
-
-# Combine flags
-python main.py --site my-client-site --days 7
 ```
 
-### Flags
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--days` | 30 | Only analyze log entries from the last N days |
-| `--limit` | 10 | Max number of sites to analyze, most recent first |
-| `--site` | None | Target a specific site by folder name |
+| Flag      | Default | Description                                       |
+|-----------|---------|---------------------------------------------------|
+| `--days`  | 30      | Only analyze log entries from the last N days     |
+| `--limit` | 10      | Max number of sites to analyze, most recent first |
+| `--site`  | None    | Target a specific site by folder name             |
 
 ---
 
-## Example Output
+### `audit_theme.py` - Theme Dependency Auditor
 
+Analyzes a WordPress theme's full dependency health. Detects the theme framework and build tool, recommends the correct
+Node version via nvm, separates safe npm updates from locked dependencies, and surfaces vulnerabilities with
+framework-aware upgrade guidance.
+
+```bash
+# Audit a specific theme
+python audit_theme.py --site my-client-site --theme my-theme
+
+# Audit by full path
+python audit_theme.py --path /full/path/to/theme
+
+# Audit all themes under a site
+python audit_theme.py --site my-client-site
 ```
-============================================================
-WP HEALTH REPORT
-============================================================
 
-Analyzing: my-client-site...
-
---- my-client-site ---
-## Top 3 Critical Issues
-1. Fatal Error in mobility-city-products.php (line 57) - Plugin throwing
-   exception during wp-settings.php inclusion, preventing WordPress from loading
-2. Maintenance Mode Active - Site displaying maintenance page as fallback
-3. WP-CLI Bootstrap Failure - Command-line operations blocked
-
-## Most Common Error Type
-PHP Fatal Error - Plugin inclusion failure blocking entire site initialization
-
-## Overall Health
-CRITICAL - Site is down.
-
-## Recommended Action
-Disable the plugin immediately by renaming its folder, then debug line 57
-for syntax errors before reactivating.
-```
+| Flag      | Default | Description                                     |
+|-----------|---------|-------------------------------------------------|
+| `--site`  | None    | Site folder name under LOCAL_SITES_PATH         |
+| `--theme` | None    | Theme folder name. If omitted, scans all themes |
+| `--path`  | None    | Full path to a theme directory                  |
 
 ---
 
 ## Health Criteria
 
-| Status | Conditions |
-|--------|------------|
-| 🔴 CRITICAL | PHP Fatal error, white screen, database connection failure, site-down condition |
-| ⚠️ WARNING | Deprecation notices, plugin conflicts, non-fatal PHP warnings, missing assets |
-| ✅ HEALTHY | Only debug/info logs, no actual errors |
+| Status   | Conditions                                                                                                    |
+|----------|---------------------------------------------------------------------------------------------------------------|
+| CRITICAL | PHP Fatal error, white screen, database connection failure, site-down condition, critical npm vulnerabilities |
+| WARNING  | Deprecation notices, plugin conflicts, non-fatal PHP warnings, high npm vulnerabilities                       |
+| HEALTHY  | Only debug/info logs, no errors, clean dependency audit                                                       |
 
 ---
 
@@ -115,6 +100,6 @@ for syntax errors before reactivating.
 
 - `.env` is gitignored -- never commit your API key
 - Sites are prioritized by most recently modified log file
-- Sites with no log entries in the specified time window are skipped automatically
 - Logs are truncated to 5,000 characters per site to keep API costs minimal
 - Typical cost per full run across 10 sites is under a penny using Claude Haiku
+- See [ROADMAP.md](ROADMAP.md) for planned scripts and upcoming features

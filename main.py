@@ -3,7 +3,7 @@ wp-vitals: Analyzes WordPress debug logs across local installs
 and surfaces actionable health reports using Claude AI.
 
 Usage:
-    python main.py                        # Analyze 10 most recent sites, last 30 days
+    python main.py                       # Analyze 10 most recent sites, last 30 days
     python main.py --days 7 --limit 5    # Last 7 days, top 5 sites
     python main.py --site my-site        # Target a specific site by folder name
 """
