@@ -30,17 +30,16 @@ framework-aware upgrade guidance.
 
 ---
 
+### `audit_plugins.py` - Complete
+
+Audits installed WordPress plugins using WP-CLI. Flags outdated plugins, major version jumps, inactive plugins, and
+auto-update status. Provides prioritized update recommendations with framework-aware context.
+
+**Flags:** `--site`, `--path`
+
+---
+
 ## Planned Scripts
-
-### `audit_plugins.py`
-
-Audits installed plugins across a WordPress site. Checks for outdated versions against the WordPress.org API and flags
-known vulnerabilities.
-
-- Pull installed plugin list via WP-CLI
-- Compare against WordPress.org version data
-- Flag plugins with available updates or known security issues
-- Severity classification: Critical / Warning / Healthy
 
 ### `analyze_lighthouse.py`
 

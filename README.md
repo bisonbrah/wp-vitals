@@ -9,6 +9,7 @@ fast TL;DR on how broken a site is before diving in.
 
 - Python 3.10+
 - Node.js + npm (for theme audits)
+- WP-CLI (for plugin audits)
 - [Local by Flywheel](https://localwp.com/) (or any local WordPress environment)
 - Anthropic API key ([get one here](https://console.anthropic.com))
 
@@ -86,13 +87,33 @@ python audit_theme.py --site my-client-site
 
 ---
 
+### `audit_plugins.py` - Plugin Auditor
+
+Audits installed WordPress plugins using WP-CLI. Flags outdated plugins, major version jumps, inactive plugins, and
+auto-update status. Provides prioritized update recommendations with framework-aware context.
+
+```bash
+# Audit plugins for a specific site
+python audit_plugins.py --site my-client-site
+
+# Audit by full WordPress root path
+python audit_plugins.py --path /full/path/to/wordpress
+```
+
+| Flag     | Default | Description                                   |
+|----------|---------|-----------------------------------------------|
+| `--site` | None    | Site folder name under LOCAL_SITES_PATH       |
+| `--path` | None    | Full path to WordPress root. Overrides --site |
+
+---
+
 ## Health Criteria
 
 | Status   | Conditions                                                                                                    |
 |----------|---------------------------------------------------------------------------------------------------------------|
 | CRITICAL | PHP Fatal error, white screen, database connection failure, site-down condition, critical npm vulnerabilities |
-| WARNING  | Deprecation notices, plugin conflicts, non-fatal PHP warnings, high npm vulnerabilities                       |
-| HEALTHY  | Only debug/info logs, no errors, clean dependency audit                                                       |
+| WARNING  | Deprecation notices, plugin conflicts, non-fatal PHP warnings, high npm vulnerabilities, outdated plugins     |
+| HEALTHY  | Only debug/info logs, no errors, clean dependency audit, all plugins current                                  |
 
 ---
 
@@ -102,4 +123,5 @@ python audit_theme.py --site my-client-site
 - Sites are prioritized by most recently modified log file
 - Logs are truncated to 5,000 characters per site to keep API costs minimal
 - Typical cost per full run across 10 sites is under a penny using Claude Haiku
+- WP-CLI must be installed and the target site must be running for plugin audits
 - See [ROADMAP.md](ROADMAP.md) for planned scripts and upcoming features
