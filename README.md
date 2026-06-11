@@ -38,6 +38,31 @@ fast TL;DR on how broken a site is before diving in.
 
 ## Scripts
 
+### `report.py` - Unified Site Health Report
+
+Runs all audits against a single WordPress install in one pass. Outputs a full
+site brief covering logs, plugins, and theme dependencies -- plus an executive
+summary and ready-to-paste debug prompts for the top issues found.
+
+```bash
+# Full report for a site
+python report.py --site my-client-site
+
+# Target a specific theme
+python report.py --site my-client-site --theme my-theme
+
+# Scope log analysis to last 7 days
+python report.py --site my-client-site --days 7
+```
+
+| Flag      | Default | Description                                        |
+|-----------|---------|----------------------------------------------------|
+| `--site`  | None    | Site folder name under LOCAL_SITES_PATH (required) |
+| `--theme` | None    | Theme folder name to target                        |
+| `--days`  | 30      | Number of days back to include in log analysis     |
+
+---
+
 ### `main.py` - Log Analyzer
 
 Analyzes WordPress debug logs across all local installs. Surfaces critical issues, common error types, and recommended
@@ -120,8 +145,7 @@ python audit_plugins.py --path /full/path/to/wordpress
 ## Notes
 
 - `.env` is gitignored -- never commit your API key
-- Sites are prioritized by most recently modified log file
 - Logs are truncated to 5,000 characters per site to keep API costs minimal
-- Typical cost per full run across 10 sites is under a penny using Claude Haiku
+- Typical cost per full report run is a few cents using Claude Haiku
 - WP-CLI must be installed and the target site must be running for plugin audits
 - See [ROADMAP.md](ROADMAP.md) for planned scripts and upcoming features

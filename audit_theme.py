@@ -3,6 +3,8 @@ wp-vitals: Analyzes a WordPress theme's dependency health.
 Detects the theme framework and version, determines the correct Node version,
 and provides a safe upgrade path for NPM packages without breaking the build.
 
+Can be run standalone or imported by report.py for unified site reporting.
+
 Usage:
     python audit_theme.py --site evanghenry
     python audit_theme.py --site evanghenry --theme egh-custom
@@ -37,6 +39,9 @@ def parse_args() -> argparse.Namespace:
 def find_theme_dirs(site: str, theme: str | None) -> list[str]:
     """
     Locate theme directories containing a package.json under a given site.
+
+    Searches common log locations for Local by Flywheel installs.
+    Results are sorted by last modified time, newest first.
 
     :param site: Site folder name under LOCAL_SITES_PATH.
     :param theme: Optional specific theme folder name to target.
@@ -86,7 +91,7 @@ def detect_framework(package_json: dict) -> dict:
     from package.json dependencies.
 
     :param package_json: Parsed package.json contents.
-    :return: Dict with framework name, version, and recommended Node version.
+    :return: Dict with framework name, version, build tool, recommended Node version, and notes.
     """
     all_deps = {}
     all_deps.update(package_json.get("dependencies", {}))
@@ -113,7 +118,7 @@ def detect_framework(package_json: dict) -> dict:
             "notes": "Bud-based build tool. Node 16-18 recommended. Avoid Node 20+ with older bud versions."
         }
 
-    # Sage 9 -- Webpack based
+    # Sage 9 -- Webpack / Laravel Mix based
     if "laravel-mix" in all_deps or (
             "@roots/sage" not in all_deps and "webpack" in all_deps
             and any(k.startswith("browser-sync") for k in all_deps)
@@ -203,7 +208,7 @@ def analyze_theme(theme_name: str, framework: dict, audit_summary: dict, compose
     """
     Send full theme dependency context to Claude for intelligent upgrade guidance.
 
-    :param theme_name: Display name of the theme.
+    :param theme_name: Display name of the theme being analyzed.
     :param framework: Detected framework info from detect_framework().
     :param audit_summary: Condensed vulnerability summary from summarize_audit().
     :param composer_json: Parsed composer.json contents or None if not present.
@@ -261,6 +266,54 @@ Max 20 lines."""
     )
 
     return message.content[0].text
+
+
+def run_theme_audit(site: str | None = None, theme: str | None = None, path: str | None = None) -> dict | None:
+    """
+    Run theme dependency audit for a single theme and return structured results.
+
+    Designed to be called by report.py for unified site reporting.
+    Returns None if no theme directory with package.json is found.
+
+    :param site: Site folder name under LOCAL_SITES_PATH.
+    :param theme: Optional specific theme folder name to target.
+    :param path: Explicit full path to a theme directory. Overrides site and theme.
+    :return: Dict with theme_name, framework, audit_summary, and report, or None on failure.
+    """
+    if path:
+        theme_dirs = [path]
+    elif site:
+        theme_dirs = find_theme_dirs(site, theme)
+    else:
+        return None
+
+    if not theme_dirs:
+        return None
+
+    # For report.py, target the first (most relevant) theme only
+    theme_dir = theme_dirs[0]
+    theme_name = os.path.basename(theme_dir)
+
+    package_json = read_json_file(os.path.join(theme_dir, "package.json"))
+    if not package_json:
+        return None
+
+    composer_json = read_json_file(os.path.join(theme_dir, "composer.json"))
+    framework = detect_framework(package_json)
+    audit_data = run_npm_audit(theme_dir)
+
+    if not audit_data:
+        return None
+
+    audit_summary = summarize_audit(audit_data)
+    report = analyze_theme(theme_name, framework, audit_summary, composer_json)
+
+    return {
+        "theme_name": theme_name,
+        "framework": framework,
+        "audit_summary": audit_summary,
+        "report": report
+    }
 
 
 def main() -> None:

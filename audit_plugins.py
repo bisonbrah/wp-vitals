@@ -3,12 +3,18 @@ wp-vitals: Audits installed WordPress plugins for a given site.
 Checks for outdated versions, major version jumps, inactive plugins,
 and auto-update status using WP-CLI and Claude AI.
 
+Automatically resolves Local by Flywheel's MySQL socket environment
+so WP-CLI can connect without needing to open Local's shell first.
+
+Can be run standalone or imported by report.py for unified site reporting.
+
 Usage:
     python audit_plugins.py --site evanghenry
     python audit_plugins.py --path /full/path/to/wordpress
 """
 
 import os
+import re
 import json
 import argparse
 import subprocess
@@ -20,6 +26,13 @@ load_dotenv()
 client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 LOCAL_SITES_PATH = os.getenv("LOCAL_SITES_PATH")
 
+LOCAL_SITES_JSON = os.path.expanduser(
+    "~/Library/Application Support/Local/sites.json"
+)
+LOCAL_SSH_ENTRY = os.path.expanduser(
+    "~/Library/Application Support/Local/ssh-entry"
+)
+
 
 def parse_args() -> argparse.Namespace:
     """Parse and return CLI arguments."""
@@ -29,6 +42,61 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--path", type=str, default=None,
                         help="Full path to WordPress root. Overrides --site.")
     return parser.parse_args()
+
+
+def get_local_env(site: str) -> dict:
+    """
+    Look up Local by Flywheel's environment variables for a given site.
+
+    Reads sites.json to find the site ID, then parses the site's ssh-entry
+    shell script to extract MYSQL_HOME and PHPRC. These are required for
+    WP-CLI to connect to Local's socket-based MySQL without opening Local's shell.
+
+    :param site: Site folder name under LOCAL_SITES_PATH.
+    :return: Dict of environment variables to inject into subprocess, or empty dict on failure.
+    """
+    try:
+        with open(LOCAL_SITES_JSON, 'r') as f:
+            sites = json.load(f)
+    except Exception:
+        return {}
+
+    # Find the site ID by matching the folder name in the path
+    site_id = None
+    for sid, data in sites.items():
+        site_path = data.get("path", "")
+        if os.path.basename(site_path).lower() == site.lower():
+            site_id = sid
+            break
+
+    if not site_id:
+        return {}
+
+    # Parse the ssh-entry shell script for environment variables
+    ssh_script = os.path.join(LOCAL_SSH_ENTRY, f"{site_id}.sh")
+    if not os.path.exists(ssh_script):
+        return {}
+
+    env_vars = {}
+    try:
+        with open(ssh_script, 'r') as f:
+            content = f.read()
+
+        # Extract export KEY="VALUE" lines
+        for match in re.finditer(r'export\s+(\w+)="([^"]+)"', content):
+            env_vars[match.group(1)] = match.group(2)
+
+        # Also extract PATH additions and prepend them
+        path_additions = re.findall(r'export PATH="([^"]+):\$PATH"', content)
+        if path_additions:
+            current_path = os.environ.get("PATH", "")
+            new_path = ":".join(path_additions) + ":" + current_path
+            env_vars["PATH"] = new_path
+
+    except Exception:
+        return {}
+
+    return env_vars
 
 
 def get_wp_path(site: str | None, path: str | None) -> str | None:
@@ -50,22 +118,31 @@ def get_wp_path(site: str | None, path: str | None) -> str | None:
     return None
 
 
-def get_plugin_list(wp_path: str) -> list[dict] | None:
+def get_plugin_list(wp_path: str, site: str | None = None) -> list[dict] | None:
     """
     Run WP-CLI to retrieve the full plugin list for a WordPress install.
 
+    Automatically injects Local by Flywheel's MySQL environment variables
+    so WP-CLI can connect to the site's socket without opening Local's shell.
     Skips drop-in pseudo-plugins (e.g. db.php) which have no version data.
     Strips any PHP deprecation warnings that appear before the JSON output.
 
     :param wp_path: Absolute path to the WordPress root directory.
+    :param site: Site folder name used to look up Local environment variables.
     :return: List of plugin dicts or None on failure.
     """
+    # Build environment with Local's MySQL socket variables injected
+    env = {**os.environ}
+    if site:
+        local_env = get_local_env(site)
+        env.update(local_env)
+
     try:
         result = subprocess.run(
             ["wp", "plugin", "list", f"--path={wp_path}", "--format=json", "--allow-root"],
             capture_output=True,
             text=True,
-            env={**os.environ, "PHP_INI_SCAN_DIR": "", "PHPRC": ""}
+            env=env
         )
 
         # Strip anything before the JSON array starts (e.g. PHP deprecation warnings)
@@ -78,8 +155,8 @@ def get_plugin_list(wp_path: str) -> list[dict] | None:
         output = output[json_start:]
         plugins = json.loads(output)
 
-        # Filter out drop-ins which have no meaningful version data
-        return [p for p in plugins if p.get("status") != "dropin"]
+        # Filter out drop-ins and must-use plugins which have no meaningful version data
+        return [p for p in plugins if p.get("status") not in ("dropin", "must-use")]
 
     except Exception as e:
         print(f"Failed to run WP-CLI: {e}")
@@ -103,7 +180,6 @@ def classify_plugins(plugins: list[dict]) -> dict:
     up_to_date = []
 
     for plugin in plugins:
-        name = plugin.get("name", "")
         status = plugin.get("status", "")
         update = plugin.get("update", "none")
         version = plugin.get("version", "")
@@ -119,7 +195,6 @@ def classify_plugins(plugins: list[dict]) -> dict:
         if update == "available" and update_version:
             needs_update.append(plugin)
 
-            # Check for major version jump
             try:
                 current_major = int(version.split(".")[0])
                 update_major = int(update_version.split(".")[0])
@@ -194,6 +269,37 @@ Keep it concise. Max 15 lines."""
     return message.content[0].text
 
 
+def run_plugin_audit(site: str | None = None, path: str | None = None) -> dict | None:
+    """
+    Run plugin audit for a single site and return structured results.
+
+    Designed to be called by report.py for unified site reporting.
+    Returns None if WP-CLI fails or no plugins are found.
+
+    :param site: Site folder name under LOCAL_SITES_PATH.
+    :param path: Explicit full path to WordPress root. Overrides site.
+    :return: Dict with site_name, classification, and report, or None on failure.
+    """
+    wp_path = get_wp_path(site, path)
+    if not wp_path:
+        return None
+
+    site_name = site or os.path.basename(wp_path)
+    plugins = get_plugin_list(wp_path, site=site)
+
+    if not plugins:
+        return None
+
+    classification = classify_plugins(plugins)
+    report = analyze_plugins(site_name, plugins, classification)
+
+    return {
+        "site_name": site_name,
+        "classification": classification,
+        "report": report
+    }
+
+
 def main() -> None:
     """Main entry point. Orchestrates plugin discovery, classification, and analysis."""
     args = parse_args()
@@ -206,7 +312,7 @@ def main() -> None:
     site_name = args.site or os.path.basename(wp_path)
 
     print(f"Auditing plugins for: {site_name}...")
-    plugins = get_plugin_list(wp_path)
+    plugins = get_plugin_list(wp_path, site=args.site)
 
     if plugins is None:
         print("Could not retrieve plugin list. Is the site running and WP-CLI available?")

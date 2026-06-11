@@ -7,6 +7,16 @@ fast TL;DR on how broken a site is before diving in.
 
 ## Current Scripts
 
+### `report.py` - Complete
+
+Unified site health orchestrator. Runs all audits against a single WordPress install in one pass and outputs a
+consolidated brief covering logs, plugins, and theme dependencies. Includes an executive summary and ready-to-paste
+debug prompts tailored to the specific issues found.
+
+**Flags:** `--site` (required), `--theme`, `--days`
+
+---
+
 ### `main.py` - Complete
 
 Analyzes WordPress debug logs across all local installs. Surfaces critical issues, common error types, and recommended
@@ -39,48 +49,12 @@ auto-update status. Provides prioritized update recommendations with framework-a
 
 ---
 
-## Planned Scripts
-
-### `analyze_lighthouse.py`
-
-Runs a Lighthouse audit against a local or live URL and summarizes findings using Claude AI.
-
-- Fire Lighthouse CLI headlessly against a target URL
-- Export results as JSON
-- Extract scores: Performance, Accessibility, SEO, Best Practices
-- Surface specific audit failures with prioritized recommendations
-
-### `audit_accessibility.py`
-
-Analyzes a WordPress theme's PHP and Blade templates for common accessibility issues.
-
-- Scan theme files for missing alt attributes, improper heading hierarchy, missing ARIA labels, and form input issues
-- Flag violations by file and line number
-- Severity classification aligned with WCAG 2.1 AA standards
-
----
-
-## Planned: Unified Health Report
-
-An orchestrator script (`report.py`) that runs all of the above against a target site and generates a single unified
-health report.
-
-**Use case:** Point it at an aging Sage 9 client site and get back a full picture -- broken error logs, outdated
-plugins, vulnerable NPM packages, Lighthouse scores, and accessibility flags -- in one pass.
-
-Output formats planned:
-
-- Terminal (current)
-- Markdown file
-- HTML report
-
----
-
 ## Planned: Web Dashboard
 
 A Django-based web interface for visualizing health reports across multiple sites.
 
 - Run audits from the browser
 - Color-coded health status per site (Critical / Warning / Healthy)
-- Historical report storage and comparison
+- Historical report storage and comparison via Postgres
+- Aggregate view across all local installs
 - Client-shareable report URLs

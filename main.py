@@ -1,9 +1,11 @@
 """
-wp-vitals: Analyzes WordPress debug logs across local installs
-and surfaces actionable health reports using Claude AI.
+wp-vitals: Analyzes WordPress debug logs across local installs.
+Surfaces critical issues, common error types, and recommended fixes using Claude AI.
+
+Can be run standalone or imported by report.py for unified site reporting.
 
 Usage:
-    python main.py                       # Analyze 10 most recent sites, last 30 days
+    python main.py                        # Analyze 10 most recent sites, last 30 days
     python main.py --days 7 --limit 5    # Last 7 days, top 5 sites
     python main.py --site my-site        # Target a specific site by folder name
 """
@@ -57,7 +59,6 @@ def find_log_files(site_filter: str | None = None) -> list[str]:
         log_files = [f for f in log_files if LOCAL_SITES_PATH and f.replace(LOCAL_SITES_PATH + "/", "").split("/")[
             0].lower() == site_filter.lower()]
 
-    # Sort by most recently modified so active sites surface first
     log_files.sort(key=lambda f: os.path.getmtime(f), reverse=True)
 
     return log_files
@@ -87,10 +88,8 @@ def filter_recent_lines(content: str, days: int) -> str:
                 if log_time >= cutoff:
                     filtered.append(line)
             except (ValueError, IndexError):
-                # Unparseable timestamp -- include to avoid dropping valid entries
                 filtered.append(line)
         else:
-            # No timestamp -- continuation line or stack trace, always include
             filtered.append(line)
 
     return "\n".join(filtered)
@@ -140,6 +139,43 @@ Logs:
     return message.content[0].text
 
 
+def run_log_analysis(site: str, days: int = 30) -> dict | None:
+    """
+    Run log analysis for a single site and return structured results.
+
+    Designed to be called by report.py for unified site reporting.
+    Returns None if no log file is found or no recent entries exist.
+
+    :param site: Site folder name under LOCAL_SITES_PATH.
+    :param days: Number of days back to include in analysis.
+    :return: Dict with site_name, report, and skipped status, or None if no logs found.
+    """
+    log_files = find_log_files(site_filter=site)
+
+    if not log_files:
+        return None
+
+    file_path = log_files[0]
+
+    try:
+        with open(file_path, 'r', errors='ignore') as f:
+            raw_content = f.read()
+
+        if not raw_content.strip():
+            return None
+
+        filtered_content = filter_recent_lines(raw_content, days)
+
+        if not filtered_content.strip():
+            return {"site_name": site, "report": None, "skipped": True, "reason": f"No entries in last {days} days"}
+
+        report = analyze_logs(site, filtered_content)
+        return {"site_name": site, "report": report, "skipped": False}
+
+    except Exception as e:
+        return {"site_name": site, "report": None, "skipped": True, "reason": str(e)}
+
+
 def main() -> None:
     """Main entry point. Orchestrates log discovery, filtering, and analysis."""
     args = parse_args()
@@ -152,18 +188,17 @@ def main() -> None:
         print(msg)
         return
 
-    # Limit only applies when analyzing all sites, not a specific one
     if not args.site:
         log_files = log_files[:args.limit]
 
     print(
         f"Analyzing {len(log_files)} site(s) | Last {args.days} days | {'Site: ' + args.site if args.site else 'Most recent first'}\n")
     print("=" * 60)
-    print("WP VITALS REPORT")
+    print("WP VITALS - LOG REPORT")
     print("=" * 60)
 
     for file_path in log_files:
-        site_name = file_path.split("/")[4]
+        site_name = file_path.replace(LOCAL_SITES_PATH + "/", "").split("/")[0]
         try:
             with open(file_path, 'r', errors='ignore') as f:
                 raw_content = f.read()
