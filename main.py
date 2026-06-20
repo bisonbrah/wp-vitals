@@ -1,13 +1,12 @@
 """
-wp-vitals: Analyzes WordPress debug logs across local installs.
+wp-vitals: Analyzes WordPress debug logs for a target WordPress install.
 Surfaces critical issues, common error types, and recommended fixes using Claude AI.
 
 Can be run standalone or imported by report.py for unified site reporting.
 
 Usage:
-    python main.py                        # Analyze 10 most recent sites, last 30 days
-    python main.py --days 7 --limit 5    # Last 7 days, top 5 sites
-    python main.py --site my-site        # Target a specific site by folder name
+    python main.py --site my-site           # Analyze site, last 30 days
+    python main.py --site my-site --days 7  # Scope to last 7 days
 """
 
 import os
@@ -26,12 +25,10 @@ LOCAL_SITES_PATH = os.getenv("LOCAL_SITES_PATH")
 def parse_args() -> argparse.Namespace:
     """Parse and return CLI arguments."""
     parser = argparse.ArgumentParser(description="wp-vitals - Analyze WordPress debug logs")
+    parser.add_argument("--site", type=str, required=True,
+                        help="Target a specific site by folder name (e.g. --site my-site)")
     parser.add_argument("--days", type=int, default=30,
                         help="Only analyze log entries from the last N days (default: 30)")
-    parser.add_argument("--limit", type=int, default=10,
-                        help="Max number of sites to analyze, most recent first (default: 10)")
-    parser.add_argument("--site", type=str, default=None,
-                        help="Target a specific site by folder name (e.g. --site my-site)")
     return parser.parse_args()
 
 
@@ -184,15 +181,10 @@ def main() -> None:
     log_files = find_log_files(site_filter=args.site)
 
     if not log_files:
-        msg = f"No log files found for site '{args.site}'." if args.site else "No log files found. Check your LOCAL_SITES_PATH."
-        print(msg)
+        print(f"No log files found for site '{args.site}'. Check your LOCAL_SITES_PATH.")
         return
 
-    if not args.site:
-        log_files = log_files[:args.limit]
-
-    print(
-        f"Analyzing {len(log_files)} site(s) | Last {args.days} days | {'Site: ' + args.site if args.site else 'Most recent first'}\n")
+    print(f"Analyzing: {args.site} | Last {args.days} days\n")
     print("=" * 60)
     print("WP VITALS - LOG REPORT")
     print("=" * 60)
