@@ -55,11 +55,11 @@ python report.py --site my-client-site --theme my-theme
 python report.py --site my-client-site --days 7
 ```
 
-| Flag      | Default | Description                                        |
-|-----------|---------|----------------------------------------------------|
-| `--site`  | None    | Site folder name under LOCAL_SITES_PATH (required) |
-| `--theme` | None    | Theme folder name to target                        |
-| `--days`  | 30      | Number of days back to include in log analysis     |
+| Flag      | Default      | Description                                    |
+|-----------|--------------|------------------------------------------------|
+| `--site`  | **required** | Site folder name under LOCAL_SITES_PATH        |
+| `--theme` | None         | Theme folder name to target                    |
+| `--days`  | 30           | Number of days back to include in log analysis |
 
 ---
 
@@ -76,10 +76,10 @@ python main.py --site my-client-site
 python main.py --site my-client-site --days 7
 ```
 
-| Flag     | Default | Description                                   |
-|----------|---------|-----------------------------------------------|
-| `--days` | 30      | Only analyze log entries from the last N days |
-| `--site` | None    | Target a specific site by folder name         |
+| Flag     | Default      | Description                                   |
+|----------|--------------|-----------------------------------------------|
+| `--site` | **required** | Target a specific site by folder name         |
+| `--days` | 30           | Only analyze log entries from the last N days |
 
 ---
 
@@ -145,4 +145,3 @@ python audit_plugins.py --path /full/path/to/wordpress
 - Logs are truncated to 5,000 characters per site to keep API costs minimal
 - Typical cost per full report run is a few cents using Claude Haiku
 - WP-CLI must be installed and the target site must be running for plugin audits
-- See [ROADMAP.md](ROADMAP.md) for planned scripts and upcoming features
