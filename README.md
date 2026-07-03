@@ -10,7 +10,9 @@ fast TL;DR on how broken a site is before diving in.
 - Python 3.10+
 - Node.js + npm (for theme audits)
 - WP-CLI (for plugin audits)
-- [Local by Flywheel](https://localwp.com/) (or any local WordPress environment)
+- [Local by Flywheel](https://localwp.com/) recommended -- plugin audits automatically resolve Local's MySQL socket
+  setup. Other local environments (MAMP, DevKinsta, Docker, etc.) work for log and theme audits, but plugin audits may
+  need manual WP-CLI/database configuration.
 - Anthropic API key ([get one here](https://console.anthropic.com))
 
 ---
@@ -145,3 +147,9 @@ python audit_plugins.py --path /full/path/to/wordpress
 - Logs are truncated to 5,000 characters per site to keep API costs minimal
 - Typical cost per full report run is a few cents using Claude Haiku
 - WP-CLI must be installed and the target site must be running for plugin audits
+
+---
+
+## License
+
+MIT -- see [LICENSE](LICENSE) for details.
